@@ -127,8 +127,8 @@ for index, row in masked_df.iterrows():
     percentage_complete = int((done / total) * 100)
 
     print(
-        (red(str(percentage_complete)) if percentage_complete < 33 else yellow(str(percentage_complete)) if percentage_complete < 67 else green(str(percentage_complete)))
-        + "% - "
+        (red(str(percentage_complete) + "%") if percentage_complete < 33 else yellow(str(percentage_complete) + "%") if percentage_complete < 67 else green(str(percentage_complete) + "%"))
+        + " - "
         + str(done)
         + "/"
         + str(total)
