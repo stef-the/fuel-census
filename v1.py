@@ -39,7 +39,9 @@ api_url = r"https://geocoding.geo.census.gov/geocoder/geographies/address?"
 # basic function to prepare spaces (' ') for url
 space_encoding = lambda x: x.replace(" ", "+")
 
-print(str(masked_df.shape[0]) + " data points")
+total = str(masked_df.shape[0])
+done = 0
+print(total + " data points")
 
 # iter through each filtered charging/refueling station
 for index, row in masked_df.iterrows():
@@ -56,7 +58,8 @@ for index, row in masked_df.iterrows():
     # eg geocoder/geographies/onelineaddress?address=4600+silver+hill+rd%2C+20233&benchmark=2020&vintage=2010&format=json
     # eg geocoder/geographies/onelineaddress?address=4600+silver+hill+rd%2C+20233&benchmark=Public_AR_Census2020&vintage=Census2010_Census2020&format=json
     request_api = api_url + "&".join(args)
-    print("\n" + request_api)
+    done += 1
+    print("\n" + str(done) + "/" + total + " " + request_api)
 
     # retrieve data from the api
     response = requests.get(request_api)
@@ -112,3 +115,4 @@ for index, row in masked_df.iterrows():
         skipped_sets += 1
 
 csv_data = masked_df.to_csv("output.csv", index=True)
+print("Skipped sets: " + str(skipped_sets))
