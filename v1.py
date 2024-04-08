@@ -39,9 +39,9 @@ api_url = r"https://geocoding.geo.census.gov/geocoder/geographies/address?"
 # basic function to prepare spaces (' ') for url
 space_encoding = lambda x: x.replace(" ", "+")
 
-total = str(masked_df.shape[0])
+total = masked_df.shape[0]
 done = 0
-print(total + " data points")
+print(str(total) + " data points")
 
 # iter through each filtered charging/refueling station
 for index, row in masked_df.iterrows():
@@ -59,7 +59,7 @@ for index, row in masked_df.iterrows():
     # eg geocoder/geographies/onelineaddress?address=4600+silver+hill+rd%2C+20233&benchmark=Public_AR_Census2020&vintage=Census2010_Census2020&format=json
     request_api = api_url + "&".join(args)
     done += 1
-    print("\n" + str(done) + "/" + total + " " + request_api)
+    print("\n" + str(int((done/total)*100)) + "% " + str(done) + "/" + str(total) + " " + request_api)
 
     # retrieve data from the api
     response = requests.get(request_api)
