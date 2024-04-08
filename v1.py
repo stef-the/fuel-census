@@ -42,7 +42,7 @@ space_encoding = lambda x: x.replace(" ", "+")
 total = masked_df.shape[0]
 done = 0
 print(str(total) + " data points")
-
+print("Running for " + date_search)
 # iter through each filtered charging/refueling station
 for index, row in masked_df.iterrows():
     args = [
