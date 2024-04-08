@@ -2,7 +2,6 @@
 
 import pandas as pd
 import requests
-import time
 
 electric_stations_dataset = "electric_stations (Apr 7 2024).csv"
 date_search = "2023-01"  # format: yyyy-mm-dd (leave empty to scan all)
