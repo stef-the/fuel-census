@@ -2,9 +2,12 @@
 
 import pandas as pd
 import requests
+import json
 
 electric_stations_dataset = "electric_stations (Apr 7 2024).csv"
 date_search = "2023-01"  # format: yyyy-mm-dd (leave empty to scan all)
+
+skipped_sets = 0
 
 # for geocoding census API
 benchmark = "Public_AR_Census2020"  # eg: "Public_AR_Census2020", "2020", etc.
@@ -30,7 +33,6 @@ NMTC_df["2020 Census Tract Number FIPS code. GEOID"] = NMTC_df[
     "2020 Census Tract Number FIPS code. GEOID"
 ].astype(str)
 
-
 # search API
 api_url = r"https://geocoding.geo.census.gov/geocoder/geographies/address?"
 
@@ -54,47 +56,59 @@ for index, row in masked_df.iterrows():
     # eg geocoder/geographies/onelineaddress?address=4600+silver+hill+rd%2C+20233&benchmark=2020&vintage=2010&format=json
     # eg geocoder/geographies/onelineaddress?address=4600+silver+hill+rd%2C+20233&benchmark=Public_AR_Census2020&vintage=Census2010_Census2020&format=json
     request_api = api_url + "&".join(args)
-    print('\n'+request_api)
+    print("\n" + request_api)
 
     # retrieve data from the api
     response = requests.get(request_api)
-    dataset = response.json()["result"]["addressMatches"]
-    for data in dataset:
-        if "geographies" in data:
-            geographies = data["geographies"]
-            if "Census Blocks" in geographies:
-                census_blocks = geographies["Census Blocks"]
-                # Assuming you want to extract the FIPS code of the first block
-                if census_blocks:
-                    first_block = census_blocks[0]
-                    fips_code = first_block.get("GEOID", None)
-                    if fips_code:
-                        fips_code_trimmed = str(fips_code)[:-4]
-                        print("FIPS Code:", fips_code_trimmed)
+    try:
+        dataset = response.json()["result"]["addressMatches"]
+        for data in dataset:
+            if "geographies" in data:
+                geographies = data["geographies"]
+                if "Census Blocks" in geographies:
+                    census_blocks = geographies["Census Blocks"]
+                    # Assuming you want to extract the FIPS code of the first block
+                    if census_blocks:
+                        first_block = census_blocks[0]
+                        fips_code = first_block.get("GEOID", None)
+                        if fips_code:
+                            fips_code_trimmed = str(fips_code)[:-4]
+                            print("FIPS Code:", fips_code_trimmed)
 
-                        lowincome_row = lowincome_df[
-                            lowincome_df[
-                                "2010 Census Tract Number FIPS code. GEOID"
-                            ].str.contains(fips_code_trimmed)
-                        ]
-                        NTMC_row = NMTC_df[
-                            NMTC_df[
-                                "2020 Census Tract Number FIPS code. GEOID"
-                            ].str.contains(fips_code_trimmed)
-                        ]
+                            lowincome_row = lowincome_df[
+                                lowincome_df[
+                                    "2010 Census Tract Number FIPS code. GEOID"
+                                ].str.contains(fips_code_trimmed)
+                            ]
+                            NTMC_row = NMTC_df[
+                                NMTC_df[
+                                    "2020 Census Tract Number FIPS code. GEOID"
+                                ].str.contains(fips_code_trimmed)
+                            ]
 
-                        case1 = lowincome_row[
-                            "Urban Low Income Community (yes, no)"
-                        ].values
+                            case1 = lowincome_row[
+                                "Urban Low Income Community (yes, no)"
+                            ].values
 
-                        case2 = NTMC_row[
-                            "Does Census Tract Qualify For NMTC Low-Income Community (LIC) on Poverty or Income Criteria?"
-                        ].values
+                            case2 = NTMC_row[
+                                "Does Census Tract Qualify For NMTC Low-Income Community (LIC) on Poverty or Income Criteria?"
+                            ].values
 
-                        
-                        masked_df["Qualify for Tax Benefits"][index] = True if case1 == ['yes'] or case2 == ['YES'] else False
+                            masked_df["Qualify for Tax Benefits"][index] = (
+                                True if case1 == ["yes"] or case2 == ["YES"] else False
+                            )
 
+                        else:
+                            print("FIPS code not found in the response")
+                            skipped_sets += 1
                     else:
-                        print("FIPS code not found in the response")
+                        skipped_sets += 1
+                else:
+                    skipped_sets += 1
+            else:
+                skipped_sets += 1
+    except json.decoder.JSONDecodeError as e:
+        print("Error decoding JSON: " + str(e))
+        skipped_sets += 1
 
 csv_data = masked_df.to_csv("output.csv", index=True)
