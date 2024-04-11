@@ -8,7 +8,7 @@ import datetime
 from cli_color_py import red, yellow, green, bold
 
 electric_stations_dataset = "electric_stations (Apr 7 2024).csv"
-date_search = "2023-02"  # format: yyyy-mm-dd (leave empty to scan all)
+date_search = "2023"  # format: yyyy-mm-dd (leave empty to scan all)
 
 skipped_sets = 0
 
@@ -21,8 +21,8 @@ df = pd.read_csv(electric_stations_dataset, low_memory=False)
 
 # create a mask to filter by date
 mask = df["Open Date"].str.contains(str(date_search), case=False, na=False)
-masked_df = df[mask]
-masked_df = masked_df.copy()
+masked_df = df[mask].copy()
+print(masked_df.keys())
 masked_df.loc[:, "Qualify for Tax Benefits"] = "None"
 
 # read cross-check datasets and convert their FIPS codes to strings for later searching
@@ -101,8 +101,8 @@ for index, row in masked_df.iterrows():
                             case2 = NTMC_row[
                                 "Does Census Tract Qualify For NMTC Low-Income Community (LIC) on Poverty or Income Criteria?"
                             ].values
-
-                            masked_df.loc[:, ("Qualify for Tax Benefits", index)] = (
+                            
+                            masked_df.loc[:, "Qualify for Tax Benefits"][index] = (
                                 True
                                 if (len(case1) > 0 and case1[0] == "yes")
                                 or (len(case2) > 0 and case2[0] == "YES")
