@@ -8,7 +8,7 @@ import datetime
 from cli_color_py import red, yellow, green, blue, bold
 
 electric_stations_dataset = "electric_stations (Apr 7 2024).csv"
-date_search = "2023-01-01"  # format: yyyy-mm-dd (leave empty to scan all)
+date_search = "2023"  # format: yyyy-mm-dd (leave empty to scan all)
 
 skipped_sets = 0
 
