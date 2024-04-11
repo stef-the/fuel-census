@@ -1,16 +1,16 @@
-# https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
-
 import pandas as pd
 import requests
 import json
 import time
 import datetime
 from cli_color_py import red, yellow, green, blue, bold
+import concurrent.futures
+from tqdm import tqdm
+import multiprocessing
 
 electric_stations_dataset = "electric_stations (Apr 7 2024).csv"
 date_search = "2023-01-01"  # format: yyyy-mm-dd (leave empty to scan all)
-
-skipped_sets = 0
+skipped_sets = multiprocessing.Value('i', 0)
 
 # for geocoding census API
 benchmark = "Public_AR_Census2020"  # eg: "Public_AR_Census2020", "2020", etc.
@@ -47,9 +47,9 @@ done, total_time = 0, 0
 print(str(total) + " data points")
 print("Running for " + date_search)
 
-# iter through each filtered charging/refueling station
-for index, row in masked_df.iterrows():
-    start_time = time.time()
+# Define a function to process a single row of data
+def process_row(row):
+    global skipped_sets
     args = [
         "street=" + space_encoding(str(row["Street Address"])),
         "city=" + space_encoding(str(row["City"])),
@@ -60,12 +60,8 @@ for index, row in masked_df.iterrows():
         "format=json",
     ]
 
-    # eg geocoder/geographies/onelineaddress?address=4600+silver+hill+rd%2C+20233&benchmark=2020&vintage=2010&format=json
-    # eg geocoder/geographies/onelineaddress?address=4600+silver+hill+rd%2C+20233&benchmark=Public_AR_Census2020&vintage=Census2010_Census2020&format=json
     request_api = api_url + "&".join(args)
-    done += 1
 
-    # retrieve data from the api
     response = requests.get(request_api)
     try:
         dataset = response.json()["result"]["addressMatches"]
@@ -74,13 +70,11 @@ for index, row in masked_df.iterrows():
                 geographies = data["geographies"]
                 if "Census Blocks" in geographies:
                     census_blocks = geographies["Census Blocks"]
-                    # Assuming you want to extract the FIPS code of the first block
                     if census_blocks:
                         first_block = census_blocks[0]
                         fips_code = first_block.get("GEOID", None)
                         if fips_code:
                             fips_code_trimmed = str(fips_code)[:-4]
-                            print(bold("FIPS Code:"), blue(fips_code_trimmed))
 
                             lowincome_row = lowincome_df[
                                 lowincome_df[
@@ -101,7 +95,7 @@ for index, row in masked_df.iterrows():
                                 "Does Census Tract Qualify For NMTC Low-Income Community (LIC) on Poverty or Income Criteria?"
                             ].values
                             
-                            masked_df.at[index, "Qualify for Tax Benefits"] = (
+                            return (
                                 True
                                 if (len(case1) > 0 and case1[0] == "yes")
                                 or (len(case2) > 0 and case2[0] == "YES")
@@ -110,31 +104,53 @@ for index, row in masked_df.iterrows():
 
                         else:
                             print(red("FIPS code not found in the response"))
-                            skipped_sets += 1
+                            with skipped_sets.get_lock():
+                                skipped_sets.value += 1
                     else:
-                        skipped_sets += 1
+                        with skipped_sets.get_lock():
+                            skipped_sets.value += 1
                 else:
-                    skipped_sets += 1
+                    with skipped_sets.get_lock():
+                        skipped_sets.value += 1
             else:
-                skipped_sets += 1
+                with skipped_sets.get_lock():
+                    skipped_sets.value += 1
     except json.decoder.JSONDecodeError as e:
-        print(red("Error decoding JSON: ") + str(e))
-        skipped_sets += 1
+        #print(red("Error decoding JSON: ") + str(e))
+        with skipped_sets.get_lock():
+            skipped_sets.value += 1
 
-    time_delta = time.time() - start_time
-    total_time += time_delta
-    percentage_complete = int((done / total) * 100)
+# Define a function to process a batch of data points
+def process_batch(batch):
+    global done
+    global total_time
+    for index, row in batch.iterrows():
+        start_time = time.time()
+        qualify_tax_benefit = process_row(row)
+        with masked_df.get_lock():
+            masked_df.at[index, "Qualify for Tax Benefits"] = qualify_tax_benefit
 
-    print(
-        (red(str(percentage_complete) + "%") if percentage_complete < 33 else yellow(str(percentage_complete) + "%") if percentage_complete < 67 else green(str(percentage_complete) + "%"))
-        + " - "
-        + str(done)
-        + "/"
-        + str(total)
-        + " - Estimate time remaining (h/m/s): "
-        + bold(str(datetime.timedelta(seconds=total_time / done * (total - done))))
-        + "\n"
-    )
+        time_delta = time.time() - start_time
+        total_time += time_delta
+        with done.get_lock():
+            done.value += 1
+
+        percentage_complete = int((done.value / total) * 100)
+
+# Split the data into batches
+batch_size = 100  # Adjust as needed
+data_batches = [masked_df[i:i+batch_size] for i in range(0, len(masked_df), batch_size)]
+
+# Process each batch in parallel using multiprocessing and show progress bar
+with tqdm(total=len(data_batches)) as pbar:
+    def update_progress(*_):
+        pbar.update()
+
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        for batch in data_batches:
+            executor.submit(process_batch, batch).add_done_callback(update_progress)
+
+# Combine the results as needed
 
 csv_data = masked_df.to_csv("output.csv", index=True)
-print("Skipped sets: " + str(skipped_sets))
+print("Skipped sets: " + str(skipped_sets.value))
