@@ -5,7 +5,7 @@ import requests
 import json
 import time
 import datetime
-from cli_color_py import red, yellow, green, bold
+from cli_color_py import red, yellow, green, blue, bold
 
 electric_stations_dataset = "electric_stations (Apr 7 2024).csv"
 date_search = "2023"  # format: yyyy-mm-dd (leave empty to scan all)
@@ -80,7 +80,7 @@ for index, row in masked_df.iterrows():
                         fips_code = first_block.get("GEOID", None)
                         if fips_code:
                             fips_code_trimmed = str(fips_code)[:-4]
-                            print("FIPS Code:", fips_code_trimmed)
+                            print(bold("FIPS Code:"), blue(fips_code_trimmed))
 
                             lowincome_row = lowincome_df[
                                 lowincome_df[
@@ -109,7 +109,7 @@ for index, row in masked_df.iterrows():
                             )
 
                         else:
-                            print("FIPS code not found in the response")
+                            print(red("FIPS code not found in the response"))
                             skipped_sets += 1
                     else:
                         skipped_sets += 1
@@ -118,8 +118,7 @@ for index, row in masked_df.iterrows():
             else:
                 skipped_sets += 1
     except json.decoder.JSONDecodeError as e:
-        print("Error decoding JSON: " + str(e))
-        print(response.text())
+        print(red("Error decoding JSON: ") + str(e))
         skipped_sets += 1
 
     time_delta = time.time() - start_time
