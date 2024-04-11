@@ -22,7 +22,6 @@ df = pd.read_csv(electric_stations_dataset, low_memory=False)
 # create a mask to filter by date
 mask = df["Open Date"].str.contains(str(date_search), case=False, na=False)
 masked_df = df[mask].copy()
-print(masked_df.keys())
 masked_df.loc[:, "Qualify for Tax Benefits"] = "None"
 
 # read cross-check datasets and convert their FIPS codes to strings for later searching
@@ -120,6 +119,7 @@ for index, row in masked_df.iterrows():
                 skipped_sets += 1
     except json.decoder.JSONDecodeError as e:
         print("Error decoding JSON: " + str(e))
+        print(response.text())
         skipped_sets += 1
 
     time_delta = time.time() - start_time
